@@ -1,0 +1,567 @@
+= SpringOne Platform 2016 : Easy Consumption of Microservices
+
+== Anatomy of the Initializr
+
+TBD
+
+== Step 0: Initial Development Setup
+
+Follow these steps to setup and configure your development environment to be able to customize the
+Initializr web application:
+
+* Fork and clone: https://github.com/spring-io/initializr.git [for the conference should this be my
+repo?]
+
+* Verify that you can actually build and run the project (this requires the https://docs.spring.io/spring-boot/docs/current/reference/html/getting-started-installing-spring-boot.html#getting-started-installing-the-cli[Spring Boot CLI])
+
+....
+% cd initializr-service
+% spring run app.groovy
+....
+
+* Visit the running Initializr http://localhost:8080/[application].
+
+* Once your sure its properly executing, quit out (ctrl-c) and then import the project into your
+favorite IDE.  We will be using IntelliJ for this but any IDE will work.
+
+IMPORTANT: When using the IDE for Initializr,  we've found it much easier to create a separate
+module that represents a more traditional "main" class over using the CLI in initializr-service.
+This will make it easier to take advantage of devtools and the debugger.
+
+* Create a new Maven module 'initializr-app'
+** Select the root "initializr" in Project view and right-click: New > Module
+** Leave "Maven" selected and click Next
+** Set artifactId :: initializr-app and click Next
+** Set Module name :: initializr-app and click Finish
+
+Now you have a sub module that will be your starting point for future customization (this makes it
+much easier to run/debug/test in your IDE).
+
+* Copy all the resources (yml/xml) from the initializr-service to initializr-app src/main/resources
+
+NOTE: this has the implication that you will need to periodically sync changes from the upstream
+project and add them to this copy of application.yml
+
+* Add required dependencies to the initializr-app pom.xml:
+
+```xml
+  <dependencies>
+    <dependency>
+      <groupId>io.spring.initializr</groupId>
+      <artifactId>initializr-web</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>io.spring.initializr</groupId>
+      <artifactId>initializr-actuator</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>io.spring.initializr</groupId>
+      <artifactId>initializr-generator</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-web</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-devtools</artifactId>
+    </dependency>
+  </dependencies>
+```
+
+. Create a new Spring Boot application class in src/main/java (under com.company.io.spring.initializr)
+
+```java
+package com.company.io.spring.initializr;
+
+import java.util.concurrent.Executor;
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.context.ApplicationContext;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.scheduling.annotation.AsyncConfigurerSupport;
+import org.springframework.scheduling.annotation.EnableAsync;
+import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
+
+@SpringBootApplication
+public class InitializrApp {
+
+  public static void main(String[] args) {
+    ApplicationContext ctx = SpringApplication.run(InitializrApp.class, args);
+  }
+
+  @Configuration
+  @EnableAsync
+  static class AsyncConfiguration extends AsyncConfigurerSupport {
+    @Override
+    public Executor getAsyncExecutor() {
+      ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
+      executor.setCorePoolSize(1);
+      executor.setMaxPoolSize(5);
+      executor.setThreadNamePrefix("initializr-");
+      executor.initialize();
+      return executor;
+    }
+  }
+}
+```
+
+Verify these changes by executing the main from the IDE.  Right-click the InitializrApp Java file
+and select > Debug 'InitializrApp'.  Again, visit http://localhost:8080 and review the running
+application.
+
+NOTE: You may have noticed that we included spring-boot-devtools in the dependencies.  This will
+really help speed up local development along with the LiveReload plug-in.
+
+If this is all working, make a change to the web template in initializr-web >
+src/main/resources/templates/home.html - change "Spring Initializr" to "My Spring Initializr" and
+select Build > Compile 'home.html' / command+shift+f9 (in IntelliJ).  Voila!
+
+== Step 1: Let's add a 3rd party dependency
+
+*Scenario*: You've discovered a great 3rd-party library you want all of your teams to start using
+it.  You also want it to be available for selection from the Initializr.  In this example, we want
+to use http://www.jasypt.org/[Jasypt] to encrypt properties in our properties files and we found the
+perfect https://github.com/ulisesbocchio/jasypt-spring-boot[project] that does that for us:
+
+. Modify the initializr-app :: src/main/resources/application.yml
+.. Add a custom section (below Ops):
+
+```yml
+    - name: Custom
+      content:
+        - name: Jasypt
+          id: jasypt
+          description: Provides Jasypt encryption support for property sources
+          version: 1.6
+          groupId: com.github.ulisesbocchio
+          artifactId: jasypt-spring-boot-starter
+```
+
+NOTE: Since Spring Boot is not managing this dependency we have to specify the exact version OR
+provide our own BOM.
+
+. Select "Make Project" and wait for the reload
+.. In the Dependencies field, you can now type 'Jasypt' or 'encrypt' and the dependency will be automatically show up.
+. Verify your changes by generating a new project with the Web, Acutator and Jasypt dependencies.
+. Unzip the generated project and add the following encrypted properties to the src/main/resources/application.properties:
+
+....
+secret.property=ENC(nrmZtkF7T0kjG/VodDvBw93Ct8EgjCA+)
+secret.password=ENC(nrmZtkF7T0kjG/VodDvBw93Ct8EgjCA+)
+....
+
+. Execute the application:
+
+....
+% ./mvnw spring-boot:run -Dserver.port=9000 -Djasypt.encryptor.password=password
+....
+
+. Visit the applications http://localhost:9000/env/[env] URL.
+Notice how Spring Boot masks the value if the property name contains password.
+
+== Step 2: Lets add a VCS .ignore file
+
+*Scenario*: Most of us are using Git right?  For those of us that are, a common step after
+generating a project is to add a .gitignore file and setup Git.  Let's just have the Initializr
+automatically do part of that for us.
+
+SIDE: Technically, there is already an open https://github.com/spring-io/initializr/issues/131[request]
+for this on the Initializr.  This is just one possible implementation.
+
+* Visit https://www.gitignore.io/
+* Type in: Java, Gradle, Maven, Eclipse and IntelliJ and hit "Generate" (or just visit https://www.gitignore.io/api/java,gradle,maven,eclipse,intellij)
+* Copy the page contents and create a file named "gitignore" in initializr-generator - src/main/resources/templates
+
+....
+# Created by https://www.gitignore.io/api/java,maven,gradle,eclipse,intellij
+
+### Maven ###
+target/
+pom.xml.tag
+pom.xml.releaseBackup
+pom.xml.versionsBackup
+pom.xml.next
+release.properties
+dependency-reduced-pom.xml
+buildNumber.properties
+.mvn/timing.properties
+
+
+### Eclipse ###
+
+.metadata
+bin/
+tmp/
+*.tmp
+*.bak
+*.swp
+*~.nib
+local.properties
+.settings/
+.loadpath
+.recommenders
+
+# Eclipse Core
+.project
+
+# External tool builders
+.externalToolBuilders/
+
+# Locally stored "Eclipse launch configurations"
+*.launch
+
+# PyDev specific (Python IDE for Eclipse)
+*.pydevproject
+
+# CDT-specific (C/C++ Development Tooling)
+.cproject
+
+# JDT-specific (Eclipse Java Development Tools)
+.classpath
+
+# Java annotation processor (APT)
+.factorypath
+
+# PDT-specific (PHP Development Tools)
+.buildpath
+
+# sbteclipse plugin
+.target
+
+# Tern plugin
+.tern-project
+
+# TeXlipse plugin
+.texlipse
+
+# STS (Spring Tool Suite)
+.springBeans
+
+# Code Recommenders
+.recommenders/
+
+
+### Intellij ###
+# Covers JetBrains IDEs: IntelliJ, RubyMine, PhpStorm, AppCode, PyCharm, CLion, Android Studio and Webstorm
+# Reference: https://intellij-support.jetbrains.com/hc/en-us/articles/206544839
+
+# User-specific stuff:
+.idea/workspace.xml
+.idea/tasks.xml
+.idea/dictionaries
+.idea/vcs.xml
+.idea/jsLibraryMappings.xml
+
+# Sensitive or high-churn files:
+.idea/dataSources.ids
+.idea/dataSources.xml
+.idea/dataSources.local.xml
+.idea/sqlDataSources.xml
+.idea/dynamic.xml
+.idea/uiDesigner.xml
+
+# Gradle:
+.idea/gradle.xml
+.idea/libraries
+
+# Mongo Explorer plugin:
+.idea/mongoSettings.xml
+
+## File-based project format:
+*.iws
+
+## Plugin-specific files:
+
+# IntelliJ
+/out/
+
+# mpeltonen/sbt-idea plugin
+.idea_modules/
+
+# JIRA plugin
+atlassian-ide-plugin.xml
+
+# Crashlytics plugin (for Android Studio and IntelliJ)
+com_crashlytics_export_strings.xml
+crashlytics.properties
+crashlytics-build.properties
+fabric.properties
+
+### Intellij Patch ###
+# Comment Reason: https://github.com/joeblau/gitignore.io/issues/186#issuecomment-215987721
+
+# *.iml
+# modules.xml
+# .idea/misc.xml
+# *.ipr
+
+
+### Java ###
+*.class
+
+# Mobile Tools for Java (J2ME)
+.mtj.tmp/
+
+# Package Files #
+*.jar
+*.war
+*.ear
+
+# virtual machine crash logs, see http://www.java.com/en/download/help/error_hotspot.xml
+hs_err_pid*
+
+
+### Gradle ###
+.gradle
+build/
+
+# Ignore Gradle GUI config
+gradle-app.setting
+
+# Avoid ignoring Gradle wrapper jar file (.jar files are usually ignored)
+!gradle-wrapper.jar
+
+# Cache of project
+.gradletasknamecache
+
+# # Work around https://youtrack.jetbrains.com/issue/IDEA-116898
+# gradle/wrapper/gradle-wrapper.properties
+....
+
+Adding the template alone will not have an effect, we have to change the Groovy generator code.
+
+* in initializr-generator, modify io.spring.initializr.ProjectGenerator > doGenerateProjectStructure (approx line 155):
+
+```groovy
+        write(new File(dir, '.gitignore'), 'gitignore', model)
+```
+
+WARNING: Normally, this should have been enough to get the file template to be included but there is
+an unusual side effect of Ant's zipfileset that excludes certain files (like .gitignore). We have
+to change this default behavior before it will work.
+
+* In initializr-web, modify io.spring.initializr.web.project.MainController > springZip (approx line 217):
+
+```groovy
+        zipfileset(dir: dir, includes: '**', excludes: wrapperScript, defaultexcludes: "no")
+```
+
+* Select the "Make Project" and wait for the UI reload.
+
+* Generate a new application and unzip it.  You should now be able to verify that a .gitingore file
+is included with Spring Boot.
+
+== Step 3: Lets add a customizable README
+
+*Scenario*: Since we are generating a starter Spring Boot application it might be a good idea to
+include a customizable README with links to documentation, etc.
+
+* Create a README.adoc file in the initializr-generator > src/main/resources/templates
+
+....
+= Spring Boot README
+
+TBD
+
+Generated on <% out.print new Date() %>
+....
+
+* in initializr-generator, modify io.spring.initializr.ProjectGenerator > doGenerateProjectStructure (appox line 156):
+
+```groovy
+        write(new File(dir, 'README.adoc'), 'README.adoc', model)
+```
+
+* Verify by selecting the "Make Project" and wait for the UI reload.  Then generate an application
+of any kind and unzip to see the README.adoc
+
+But wait, there is more that can be done.  Since the Initializr is using Groovy templates, it is
+possible to get full access to the metadata model inside of the README.  We can enhance it to
+include more information about the original generation process and even provide conditional
+documentation:
+
+....
+= Spring Boot README
+
+== ${name}
+
+* Group: ${groupId}
+* Artifact: ${artifactId}
+* Java Version: ${javaVersion}
+
+${description}
+
+== Dependencies
+
+<% compileDependencies.each { %>* ${it.groupId}:${it.artifactId}${it.version ? ":$it.version" : ""}
+<% } %>
+
+<% if (compileDependencies.find { it -> it.artifactId == 'jasypt-spring-boot-starter' }) { %>
+=== Jasypt
+To add encrypted properties, please refer to the following https://github.com/ulisesbocchio/jasypt-spring-boot[documentation].
+<% } %>
+
+----
+Generated on <% out.print new Date() %>
+....
+
+FYI: You might have to touch the ProjectGenerator.groovy file to be able to force a Make Project to
+occur (sometimes just modifying the template isn't enough for IntelliJ to think something has
+changed).
+
+* Make Project and wait for the UI reload.  This time, generate an application with the Jasypt
+dependency and see that it contains the extra documentation link.
+
+== Step 4: Wait a minute!  You've not been writing any unit tests! (Lets write some tests)
+
+....
+% mvn clean package
+....
+
+Well, at least we haven't broken anything (yet).  However, testing of the Initializer can be HARD
+and its actualy quite easy to break something.
+
+* Add a test case to ProjectGeneratorTests.groovy (initializr-generator >
+src/test/groovy/io/spring/initializr/generator)
+
+```groovy
+	@Test
+	void customFilesWithDefaultProject() {
+		def request = createProjectRequest('web')
+		generateProject(request)
+				.hasFile(".gitignore")
+				.hasFile("README.adoc")
+	}
+```
+
+* Run the JUnit tests and verify that you get a GREEN bar.  This verifies that both Step 2 and
+Step 3 are actually generating a file as part of the project.
+
+* Now lets add a test that verifies that the README.adoc actually contains the extra info when we
+include Jasypt.  To do this well need to add an additional assetion to the built-in ProjectAssert that the tests are
+already using.  This will make sure a specific value is found in the file passed in:
+
+```groovy
+	ProjectAssert assertFileContains(String localPath, String... expressions) {
+		def candidate = file(localPath).text;
+		for (String expression : expressions) {
+			assertTrue "$expression has not been found in source file '$localPath'", candidate.contains(expression)
+		}
+		this
+	}
+```
+
+We can now use this as part of a formal test in ProjectGeneratorTests.groovy (initializr-generator >
+src/test/groovy/io/spring/initializr/generator):
+
+```groovy
+	@Test
+	void readmeContainsExtraInfoWithJasyptDeps() {
+		def dependency = new Dependency(id: 'jasypt', groupId: 'com.github.ulisesbocchio', artifactId: 'jasypt-spring-boot-starter', version: "1.6")
+		dependency.facets << 'web'
+		def metadata = InitializrMetadataTestBuilder.withDefaults()
+				.addDependencyGroup('core', 'web', 'security', 'data-jpa')
+				.addDependencyGroup('test', dependency).build()
+		applyMetadata(metadata)
+
+		def request = createProjectRequest('jasypt')
+
+		generateProject(request)
+				.hasFile("README.adoc")
+				.assertFileContains("README.adoc", "=== Jasypt");
+	}
+```
+
+NOTE: In the long run, it is arguably better to just create a brand new test case for your customized
+behaviors - this should limit the merge conflicts that you have when the Initializr project matures
+(and it will).  Remember what we're typically doing is higly customized behaviors that are unique to
+our company or team.  These aren't likely to be adopted by the Initializr team, so we'll frequently
+end up having to merge in changes from upstream.
+
+== Step 5: Let's make it easier to generate a "standard" Microservice
+
+*Scenario*: We want some standardization on the required starters for our team (for example, all
+services need to use Actuator).  The default Initializr doesn't have any built-in support for groups
+of dependencies, so lets add the ability to support this
+
+* In initializr-web > src/main/resources/templates modify the home.html to include a selection
+element for the various application archetypes we want to support:
+
+```html
+                    <!-- begin custom stuff -->
+                    <div class="form-group">
+                        <label for="archetypes" class="control-label">Select a Starter Archetype</label>
+                        <select id="archetypes">
+                            <option value="NONE">Ad hoc</option>
+                            <option value="REST">Microservice (REST)</option>
+                            <option value="FOO">Foo</option>
+                            <option value="BAR">Bar</option>
+                        </select>
+                    </div>
+                    <!-- end custom stuff -->
+```
+
+This modifies the default Initializr UI to include a Select field just above the "Search for
+dependencies" field.  Our goal is to auto select dependencies for a specific application archetype.
+
+* Add an change listener to this element in the src/main/resources/static/js start.js file:
+
+```javascript
+    // begin custom changes
+    $("#archetypes").on("change", function (e) {
+        // this could be a little smarter...
+        $("#starters div").remove();
+        $("#dependencies input").prop('checked', false);
+        var results = [];
+        switch ($(this).find(":selected").val()) {
+        case "REST":
+            results = starters.get(['web','actuator','cloud-hystrix','security', 'jasypt', 'cloud-starter-sleuth', 'devtools']);
+            break;
+        case "FOO":
+            results = starters.get(['thymeleaf', 'web', 'actuator', 'security', 'devtools']);
+            break;
+        case "BAR":
+            results = starters.get(['batch']);
+        }
+        for (var i = 0; i < results.length; i++) {
+            addTag(results[i].id, results[i].name);
+            $("#dependencies input[value='" + results[i].id + "']").prop('checked', true);
+        }
+    });
+    // end custom changes
+```
+
+* Click "Make Project" and verify that selecting the REST archetype now auto selects the predefined
+starters.
+
+Combined with being able to add our own custom dependencies we now have a solid base for quickly
+generating Boot apps that are more in line with our team's guidelines and standards.  We can ensure
+our teammates will be setup for success right out of the gate.
+
+== Step 6: Let's enhance our Git support
+
+*Scenario*: We already created a .gitignore file to support our VCS but what we'd really like is to
+have the repo automatically created with the initial commit.  In fact, why not just go all the way
+and push this first commit directly to GitHub?
+
+* In the initializr-generator lets add a dependency to JGit to the pom.xml (approx line 31):
+
+```xml
+		<dependency>
+			<groupId>org.eclipse.jgit</groupId>
+			<artifactId>org.eclipse.jgit</artifactId>
+			<version>4.4.0.201606070830-r</version>
+		</dependency>
+```
+
+* Refresh the Maven dependencies.  This library will make it possible to initialize git and perform
+a automated push, but first, lets make this an option that a user can select.  Add a checkbox to
+the initializr-web form in src/main/resources/templates/home.html (approx line 38):
+
+```html
+                    Initialize as a Git Repo? <input type="checkbox" id="initGit" name="initGit" tabindex="2">
+```
+
+
+
