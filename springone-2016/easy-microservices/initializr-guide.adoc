@@ -560,8 +560,114 @@ a automated push, but first, lets make this an option that a user can select.  A
 the initializr-web form in src/main/resources/templates/home.html (approx line 38):
 
 ```html
-                    Initialize as a Git Repo? <input type="checkbox" id="initGit" name="initGit" tabindex="2">
+                    <h3> Initialize Git Repo?
+                        <input type="checkbox" id="initGit" name="initGit" tabindex="2">
+                    </h3>
 ```
 
+With a simple checkbox we can now toggle the decision to initialize a git repository
+as part of the Generate.  To fully support this, we need to add the attribute to
+the underlying model.
 
+* Add a Boolean property to BasicProjectRequest.groovy in initializr-generator >
+src/main/groovy/io/spring/initializr/generator (approx line 42):
 
+```groovy
+	Boolean initGit
+```
+
+Just adding this attribute now makes it available in the ProjectGenerator.
+
+* Wrap the original gitignore write logic with a check and call out to a new
+method to do the actual git init:
+
+```groovy
+if (request.initGit == true) {
+  write(new File(dir, '.gitignore'), 'gitignore', model)
+  gitSetup(dir, request)
+}
+```
+
+And then add the new getSetup function:
+
+```groovy
+void gitSetup(File dir, ProjectRequest request) {
+  Git git;
+  try {
+    // use ~/.github/conf.properties
+    Properties props = new Properties()
+    File propFile = new File(System.properties['user.home'], ".github/conf.properties")
+    propFile.withInputStream{ props.load(it) }
+
+    // git init, add and commit
+    git = Git.init().setDirectory(dir).call();
+    git.add().addFilepattern(".").call();
+    git.commit().setAll(true).setMessage("Initial commit by Initializr").call();
+
+    // git remote and branch config
+    StoredConfig config = git.getRepository().getConfig();
+    config.setString(CONFIG_REMOTE_SECTION, "origin", "url", "${props.url}/${request.name}.git");
+    config.setString(CONFIG_BRANCH_SECTION, "master", "remote", "origin");
+    config.setString(CONFIG_BRANCH_SECTION, "master", "merge", "refs/heads/master");
+    config.save();
+
+    // now push it
+    git.push().setCredentialsProvider(new UsernamePasswordCredentialsProvider(props.username, props.password)).call();
+  } catch (Exception ex) {
+    publishProjectFailedEvent(request, ex)
+    throw ex
+  } finally {
+    git?.close();
+  }
+}
+```
+
+NOTE: We found a slight issue with the build wrapper scripts and the git setup
+related to the fact that the zipfileset process is marking them as executable
+(after the git commit).  This causes git to see set the files as being modified
+when you unzip the repo.  Our workaround is to modify the writeTextResource
+process and add a call to setExecutable(true).
+
+* In ProjectGenerator.groovy (approx line 321)
+
+```groovy
+writeTextResource(dir, 'gradlew', 'gradle/gradlew').setExecutable(true)
+```
+
+And (appox line 324):
+
+```groovy
+writeTextResource(dir, 'mvnw', 'maven/mvnw').setExecutable(true)
+```
+
+Now the files will be committed with 755.  Note, this approach might not work on
+Windows systems.  If you unzip the generated project and do a git status and see
+something not up to date, this is likely the cause.
+
+Before we can actually test these changes, we need to perform a couple of manual
+steps on GitHub.
+
+* Go to your personal GitHub account and create an empty repo called
+"demo-mytest"
+
+* In your personal home folder, create a folder/file ~/.github/conf.properties
+
+```
+url=https://github.com/<your-github-name>
+username=<your-oath-token>
+password=
+```
+
+See https://help.github.com/articles/creating-an-access-token-for-command-line-use/
+for more info on GitHub OAuth tokens.
+
+* Restart the initializr app and generate a Boot application with the Artifact
+name "demo-mytest".  Make sure you select the Initialize Git Repo? [X] option.
+
+WARNING: If you see errors about authentication it is likely your OAuth token
+isn't valid or is not be read properly by the initGit function (use your
+debugger to verify this).  You may also get a NoRemoteRepository exception.  In
+this case, it is likely the Artifact name does not match the empty repository
+name.
+
+ 
