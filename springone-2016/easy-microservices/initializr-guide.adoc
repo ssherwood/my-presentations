@@ -661,13 +661,72 @@ password=
 See https://help.github.com/articles/creating-an-access-token-for-command-line-use/
 for more info on GitHub OAuth tokens.
 
-* Restart the initializr app and generate a Boot application with the Artifact
+* Restart the Initializr app and generate a Boot application with the Artifact
 name "demo-mytest".  Make sure you select the Initialize Git Repo? [X] option.
 
 WARNING: If you see errors about authentication it is likely your OAuth token
 isn't valid or is not be read properly by the initGit function (use your
 debugger to verify this).  You may also get a NoRemoteRepository exception.  In
 this case, it is likely the Artifact name does not match the empty repository
-name.
+name in GitHub.
 
- 
+By now, you should be able to see where this is all going.  We're very close to
+having a completely automated repo provisioned directly from the Initializr.
+
+== Step 7: Use the GitHub API to finalize automation
+
+*Scenario*: We want to fully automate the work from Step 6.  Since GitHub
+requires an empty repo to be created before it can be pushed, we'll have to
+explore options as to how to do this from code.
+
+* Add the http://github-api.kohsuke.org/[GitHub API] dependency to the
+initializr-generator project pom.xml (right under the jgit dependency):
+
+```xml
+    <dependency>
+      <groupId>org.kohsuke</groupId>
+      <artifactId>github-api</artifactId>
+      <version>1.76</version>
+    </dependency>
+```
+
+* Refresh the IntelliJ dependency and add the logic to the gitSetup function in
+ProjectGenerator.groovy (approx line 183):
+
+```groovy
+    // initialize the remote repo
+    GitHub gitHub = GitHub.connect();
+    gitHub.createRepository(request.name)
+          .description(request.description)
+          .create();
+```
+
+We had to make a minor refactor to the .github/conf.properties file.  The
+"GitHub API for Java" uses a .github file in the user home folder.  All I needed
+to do was remove the folder and recreate a text file called .github with the
+conf.properties and an additional oauth property
+
+```
+url=<your github home>
+username=<your oauth token>
+password=
+oauth=<your oauth token>
+```
+
+And update the properties loader in the ProjectGenerator (approx line 180):
+
+```groovy
+			File propFile = new File(System.properties['user.home'], ".github")
+```
+
+SIDE: We should probably just go back to Step 6 and refactor that step to setup
+the .github configuration file as needed by this step (it was just lucky how
+close we actually were).
+
+* Restart the app and wait for the UI to refresh.
+
+Assuming the changes take effect, you should now be able to generate from the
+Initializr and have it automatically create the GitHub repo for you.  This was
+actually pretty easy.
+
+== Step 8:
