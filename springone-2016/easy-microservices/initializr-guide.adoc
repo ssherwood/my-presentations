@@ -142,7 +142,7 @@ NOTE: Since Spring Boot is not managing this dependency we have to specify the e
 provide our own BOM.
 
 . Select "Make Project" and wait for the reload
-.. In the Dependencies field, you can now type 'Jasypt' or 'encrypt' and the dependency will be automatically show up.
+.. In the Dependencies field, you can now type 'Jasypt' or 'encrypt' and the dependency will automatically show up.
 . Verify your changes by generating a new project with the Web, Acutator and Jasypt dependencies.
 . Unzip the generated project and add the following encrypted properties to the src/main/resources/application.properties:
 
@@ -439,7 +439,7 @@ src/test/groovy/io/spring/initializr/generator)
 Step 3 are actually generating a file as part of the project.
 
 * Now lets add a test that verifies that the README.adoc actually contains the extra info when we
-include Jasypt.  To do this well need to add an additional assetion to the built-in ProjectAssert that the tests are
+include Jasypt.  To do this well need to add an additional assertion to the built-in ProjectAssert that the tests are
 already using.  This will make sure a specific value is found in the file passed in:
 
 ```groovy
