@@ -142,7 +142,7 @@ NOTE: Since Spring Boot is not managing this dependency we have to specify the e
 provide our own BOM.
 
 . Select "Make Project" and wait for the reload
-.. In the Dependencies field, you can now type 'Jasypt' or 'encrypt' and the dependency will automatically show up.
+.. In the Dependencies field, you can now type 'Jasypt' or 'encrypt' and the dependency will be automatically show up.
 . Verify your changes by generating a new project with the Web, Acutator and Jasypt dependencies.
 . Unzip the generated project and add the following encrypted properties to the src/main/resources/application.properties:
 
@@ -439,7 +439,7 @@ src/test/groovy/io/spring/initializr/generator)
 Step 3 are actually generating a file as part of the project.
 
 * Now lets add a test that verifies that the README.adoc actually contains the extra info when we
-include Jasypt.  To do this well need to add an additional assertion to the built-in ProjectAssert that the tests are
+include Jasypt.  To do this well need to add an additional assetion to the built-in ProjectAssert that the tests are
 already using.  This will make sure a specific value is found in the file passed in:
 
 ```groovy
@@ -735,22 +735,30 @@ actually pretty easy.
 but since Travis-CI has a REST API we want to see if we can also automate the
 first build as part of the Initializr pipeline.
 
-* Before we work on any code lets first install the Travis-CI CLI.  Follow this
-https://github.com/travis-ci/travis.rb#installation[guide] to complete the install
-for your OS.
+* First, make sure you have linked your GitHub account and Travis-CI.  Go to
+https://travis-ci.org/ and sign in with your GitHub account.  TODO: We probably
+need more details here (I don't remember exactly what I did to get the web site
+setup completed).
 
-From the command-line, you should be able to login using your previously generated
-OAuth token from GitHub:
+* Once our accounts are linked we should install the Travis-CI CLI (we won't
+use this directly from Initializr but it can be very useful during setup and
+debugging).  Follow this
+https://github.com/travis-ci/travis.rb#installation[guide] to complete the
+install for your OS.
+
+From the command-line, you should be able to login to Travis-CI using your
+previously generated token from GitHub:
 
 ```
 % travis login --org --github-token <your github token>
 ```
 
 NOTE: Travis-CI needs very explicit account permission that you grant via the
-access token.  You will want to verify that you have given it: repo(all),
-admin:org->read:org, admin:repo_hook(all), and user->user:email.
+GitHub access token.  You will want to verify that you have granted it
+(Account -> Personal Access Tokens): repo(all), admin:org->read:org,
+admin:repo_hook(all), and user->user:email.
 
-* Generate a Travis-CI access token
+* Generate a Travis-CI access token from the command line:
 
 ```
 % travis token
@@ -759,8 +767,112 @@ admin:org->read:org, admin:repo_hook(all), and user->user:email.
 Paste the token the that Travis-CI CLI generates into the .github conf file as
 a property called `travisauth`.
 
+```
+url=<your github url>
+username=<github auth token>
+password=
+oauth=<github auth token>
+travisauth=<your travis token>
+```
 
+* For Travis-CI to work, the project needs to have a .travis.yml file added to
+its root directory.  We can do this by adding a new template file (just like the
+earlier steps).  In the initializr-generator > src/main/resources/templates add
+a travis.yml file:
 
+```yml
+language: java
+jdk:
+- oraclejdk8
+# would just use default install/script but the ./mvnw script errors on travis
+# obviously this only works for maven builds right now...
+install:
+- mvn install -DskipTests=true -Dmaven.javadoc.skip=true -B -V
+script:
+- mvn test
+```
 
-travis sync
-travis enable -r ssherwood/demo-travis1
+NOTE: By default, Travis-CI should be able to build this project without the
+install/script customization but we ran into some issues with it running the
+wrapper (mvnw).  By specifying the install/script steps we are explicitly
+overriding the default behavior to avoid this issue.
+
+* Next add the logic to the ProjectGenerator.groovy file to copy this template
+during the generate step (approx line 173):
+
+```groovy
+if (request.initGit == true) {
+  write(new File(dir, '.gitignore'), 'gitignore', model)
+  write(new File(dir, '.travis.yml'), 'travis.yml', model)
+  gitSetup(dir, request)
+}
+```
+
+* Add a Boolean attribute to the BaseProjectRequest.groovy to allow us to turn
+off Travis-CI integration (we won't hook it up to the UI right now):
+
+```groovy
+	Boolean initTravisCI = true
+```
+
+* Unfortunately we were unable to find a JVM implementation of the Travis-CI API,
+so we will have to work with the REST interface directly.  To facilitate this,
+we'll use the Spring RestTemplate.  That class is not currently available in the
+generator, so we'll have to add a dependency to the project pom.xml (approx line
+18):
+
+```xml
+<dependency>
+  <groupId>org.springframework</groupId>
+  <artifactId>spring-web</artifactId>
+</dependency>
+```
+
+* Force a Maven dependencies refresh.  Now add a some logic to the setupGit
+method in ProjectGenerator.groovy to trigger Travis-CI setup:
+
+```groovy
+if (request.initTravisCI == true) {
+  // you need to enable travis-ci before the first push for it to automatically build
+  initTravisCI(props, request)
+}
+```
+
+And then add a new initTravisCI method to the same class (approx line 222):
+
+```groovy
+void initTravisCI(Properties props, ProjectRequest request) {
+  // setup travis-ci to automatically build on push
+  String travisUrl = "https://api.travis-ci.org";
+  RestTemplate restTemplate = new RestTemplate()
+
+  HttpHeaders headers = new HttpHeaders();
+  headers.setContentType(MediaType.APPLICATION_JSON)
+  headers.set(HttpHeaders.ACCEPT, "application/vnd.travis-ci.2+json");
+  // todo we could get auth token dynamically...
+  headers.set(HttpHeaders.AUTHORIZATION, "token ${props.travisauth}")
+  headers.set(HttpHeaders.USER_AGENT, "Travis/1.0")
+
+  def users = restTemplate.exchange("${travisUrl}/users", HttpMethod.GET, new HttpEntity(headers), Object.class)
+  // force sync so the project is visible to travis-ci
+  def sync = restTemplate.exchange("${travisUrl}/users/sync", HttpMethod.POST, new HttpEntity<Object>(users, headers), Object.class)
+
+  // now wait for the sync to finish...
+  def isSyncing = true;
+  while (isSyncing) {
+    sleep(500)
+    users = restTemplate.exchange("${travisUrl}/users/${users.body.user.id}", HttpMethod.GET, new HttpEntity(headers), Object.class)
+    isSyncing = users.body.user.is_syncing
+  }
+
+  // get the repo id
+  def repos = restTemplate.exchange("${travisUrl}/repos/${users.body.user.login}/${request.name}", HttpMethod.GET, new HttpEntity(headers), Object.class)
+  // make the repo active (aka flick the repository switch on)
+  def hooks = restTemplate.exchange("${travisUrl}/hooks", HttpMethod.PUT, new HttpEntity("{\"hook\":{\"id\":${repos.body.repo.id},\"active\":true}}", headers), Object.class)
+}
+```
+
+* Select Make Project and wait for the UI to refresh.  You should now be able to
+generate a project from the Initalizr that not only will create and push the
+code to GitHub but a Travis-CI build will be setup.  If everything worked as
+expected a build should be kicked off in a few minutes.
