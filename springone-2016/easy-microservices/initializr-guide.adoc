@@ -868,11 +868,25 @@ void initTravisCI(Properties props, ProjectRequest request) {
   // get the repo id
   def repos = restTemplate.exchange("${travisUrl}/repos/${users.body.user.login}/${request.name}", HttpMethod.GET, new HttpEntity(headers), Object.class)
   // make the repo active (aka flick the repository switch on)
-  def hooks = restTemplate.exchange("${travisUrl}/hooks", HttpMethod.PUT, new HttpEntity("{\"hook\":{\"id\":${repos.body.repo.id},\"active\":true}}", headers), Object.class)
+  String body = "{\"hook\":{\"id\":${repos.body.repo.id},\"active\":true}}"
+  def hooks = restTemplate.exchange("${travisUrl}/hooks", HttpMethod.PUT, new HttpEntity<String>(body, headers), Object.class)
 }
 ```
 
 * Select Make Project and wait for the UI to refresh.  You should now be able to
-generate a project from the Initalizr that not only will create and push the
+generate a project from the Initializr that not only will create and push the
 code to GitHub but a Travis-CI build will be setup.  If everything worked as
 expected a build should be kicked off in a few minutes.
+
+== Step 9:
+
+https://docs.travis-ci.com/user/deployment/cloudfoundry
+
+
+
+== Parking Lot Ideas
+
+- Add Travis-CI Build status to the README.adoc
+-- ex. [![Build Status](https://travis-ci.org/ssherwood/demo-travis9.svg?branch=master)](https://travis-ci.org/ssherwood/demo-travis9)
+- SonarQube integration: https://docs.travis-ci.com/user/sonarqube/
+- Add support for encrypted properties in Travis-CI: https://docs.travis-ci.com/user/encryption-keys/
