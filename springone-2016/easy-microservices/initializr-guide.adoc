@@ -730,3 +730,37 @@ Initializr and have it automatically create the GitHub repo for you.  This was
 actually pretty easy.
 
 == Step 8:
+
+*Scenario*: We usually setup a Travis-CI build manually after the first commit
+but since Travis-CI has a REST API we want to see if we can also automate the
+first build as part of the Initializr pipeline.
+
+* Before we work on any code lets first install the Travis-CI CLI.  Follow this
+https://github.com/travis-ci/travis.rb#installation[guide] to complete the install
+for your OS.
+
+From the command-line, you should be able to login using your previously generated
+OAuth token from GitHub:
+
+```
+% travis login --org --github-token <your github token>
+```
+
+NOTE: Travis-CI needs very explicit account permission that you grant via the
+access token.  You will want to verify that you have given it: repo(all),
+admin:org->read:org, admin:repo_hook(all), and user->user:email.
+
+* Generate a Travis-CI access token
+
+```
+% travis token
+```
+
+Paste the token the that Travis-CI CLI generates into the .github conf file as
+a property called `travisauth`.
+
+
+
+
+travis sync
+travis enable -r ssherwood/demo-travis1
