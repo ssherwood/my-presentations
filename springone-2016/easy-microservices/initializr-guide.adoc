@@ -9,8 +9,9 @@ TBD
 Follow these steps to setup and configure your development environment to be able to customize the
 Initializr web application:
 
-* Fork and clone: https://github.com/spring-io/initializr.git [for the conference should this be my
-repo?]
+* Fork and clone: https://github.com/spring-io/initializr.git [for this guide,
+you can clone https://github.com/ssherwood/initializr which starts on commit
+a415cdc671d93beb83c15b5c47a05e674574378f]
 
 * Verify that you can actually build and run the project (this requires the https://docs.spring.io/spring-boot/docs/current/reference/html/getting-started-installing-spring-boot.html#getting-started-installing-the-cli[Spring Boot CLI])
 
@@ -125,7 +126,7 @@ to use http://www.jasypt.org/[Jasypt] to encrypt properties in our properties fi
 perfect https://github.com/ulisesbocchio/jasypt-spring-boot[project] that does that for us:
 
 . Modify the initializr-app :: src/main/resources/application.yml
-.. Add a custom section (below Ops):
+.. Add a custom section (below Ops approx line 643):
 
 ```yml
     - name: Custom
@@ -331,7 +332,7 @@ gradle-app.setting
 
 Adding the template alone will not have an effect, we have to change the Groovy generator code.
 
-* in initializr-generator, modify io.spring.initializr.ProjectGenerator > doGenerateProjectStructure (approx line 155):
+* in initializr-generator, modify io.spring.initializr.ProjectGenerator > doGenerateProjectStructure (approx line 157):
 
 ```groovy
         write(new File(dir, '.gitignore'), 'gitignore', model)
@@ -367,7 +368,7 @@ TBD
 Generated on <% out.print new Date() %>
 ....
 
-* in initializr-generator, modify io.spring.initializr.ProjectGenerator > doGenerateProjectStructure (appox line 156):
+* in initializr-generator, modify io.spring.initializr.ProjectGenerator > doGenerateProjectStructure (appox line 157):
 
 ```groovy
         write(new File(dir, 'README.adoc'), 'README.adoc', model)
@@ -420,7 +421,7 @@ dependency and see that it contains the extra documentation link.
 ....
 
 Well, at least we haven't broken anything (yet).  However, testing of the Initializer can be HARD
-and its actualy quite easy to break something.
+and its actually quite easy to break something.
 
 * Add a test case to ProjectGeneratorTests.groovy (initializr-generator >
 src/test/groovy/io/spring/initializr/generator)
@@ -475,7 +476,7 @@ src/test/groovy/io/spring/initializr/generator):
 
 NOTE: In the long run, it is arguably better to just create a brand new test case for your customized
 behaviors - this should limit the merge conflicts that you have when the Initializr project matures
-(and it will).  Remember what we're typically doing is higly customized behaviors that are unique to
+(and it will).  Remember what we're typically doing is highly customized behaviors that are unique to
 our company or team.  These aren't likely to be adopted by the Initializr team, so we'll frequently
 end up having to merge in changes from upstream.
 
@@ -486,7 +487,7 @@ services need to use Actuator).  The default Initializr doesn't have any built-i
 of dependencies, so lets add the ability to support this
 
 * In initializr-web > src/main/resources/templates modify the home.html to include a selection
-element for the various application archetypes we want to support:
+element for the various application archetypes we want to support (approx line 109):
 
 ```html
                     <!-- begin custom stuff -->
@@ -505,7 +506,8 @@ element for the various application archetypes we want to support:
 This modifies the default Initializr UI to include a Select field just above the "Search for
 dependencies" field.  Our goal is to auto select dependencies for a specific application archetype.
 
-* Add an change listener to this element in the src/main/resources/static/js start.js file:
+* Add an change listener to this element in the src/main/resources/static/js start.js file
+(approx line 267):
 
 ```javascript
     // begin custom changes
@@ -579,7 +581,7 @@ src/main/groovy/io/spring/initializr/generator (approx line 42):
 Just adding this attribute now makes it available in the ProjectGenerator.
 
 * Wrap the original gitignore write logic with a check and call out to a new
-method to do the actual git init:
+method to do the actual git init (approx line 158):
 
 ```groovy
 if (request.initGit == true) {
@@ -594,9 +596,9 @@ And then add the new getSetup function:
 void gitSetup(File dir, ProjectRequest request) {
   Git git;
   try {
-    // use ~/.github/conf.properties
+    // use ~/.github properties file
     Properties props = new Properties()
-    File propFile = new File(System.properties['user.home'], ".github/conf.properties")
+    File propFile = new File(System.properties['user.home'], ".github")
     propFile.withInputStream{ props.load(it) }
 
     // git init, add and commit
@@ -606,13 +608,10 @@ void gitSetup(File dir, ProjectRequest request) {
 
     // git remote and branch config
     StoredConfig config = git.getRepository().getConfig();
-    config.setString(CONFIG_REMOTE_SECTION, "origin", "url", "${props.url}/${request.name}.git");
-    config.setString(CONFIG_BRANCH_SECTION, "master", "remote", "origin");
-    config.setString(CONFIG_BRANCH_SECTION, "master", "merge", "refs/heads/master");
+    config.setString(ConfigConstants.CONFIG_REMOTE_SECTION, "origin", "url", "${props.url}/${request.name}.git");
+    config.setString(ConfigConstants.CONFIG_BRANCH_SECTION, "master", "remote", "origin");
+    config.setString(ConfigConstants.CONFIG_BRANCH_SECTION, "master", "merge", "refs/heads/master");
     config.save();
-
-    // now push it
-    git.push().setCredentialsProvider(new UsernamePasswordCredentialsProvider(props.username, props.password)).call();
   } catch (Exception ex) {
     publishProjectFailedEvent(request, ex)
     throw ex
@@ -650,7 +649,7 @@ steps on GitHub.
 * Go to your personal GitHub account and create an empty repo called
 "demo-mytest"
 
-* In your personal home folder, create a folder/file ~/.github/conf.properties
+* In your personal home folder, create a folder/file ~/.github
 
 ```
 url=https://github.com/<your-github-name>
@@ -701,10 +700,8 @@ ProjectGenerator.groovy (approx line 183):
           .create();
 ```
 
-We had to make a minor refactor to the .github/conf.properties file.  The
-"GitHub API for Java" uses a .github file in the user home folder.  All I needed
-to do was remove the folder and recreate a text file called .github with the
-conf.properties and an additional oauth property
+The GitHub API looks specifically for an oauth property in your ~/.github conf
+file:
 
 ```
 url=<your github home>
@@ -712,16 +709,6 @@ username=<your oauth token>
 password=
 oauth=<your oauth token>
 ```
-
-And update the properties loader in the ProjectGenerator (approx line 180):
-
-```groovy
-			File propFile = new File(System.properties['user.home'], ".github")
-```
-
-SIDE: We should probably just go back to Step 6 and refactor that step to setup
-the .github configuration file as needed by this step (it was just lucky how
-close we actually were).
 
 * Restart the app and wait for the UI to refresh.
 
