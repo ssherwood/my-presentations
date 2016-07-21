@@ -2,7 +2,23 @@
 
 == Anatomy of the Initializr
 
-TBD
+Spring Initializr provides an extensible API to generate quickstart projects.
+It also provides a configurable service: you can see our default instance at
+https://start.spring.io. It provides a simple web UI to configure the project
+to generate and endpoints that you can use via plain HTTP.
+
+The Initializr is a multi-module Maven project conaining:
+
+* initializr-generator: standalone project generation library that can be reused in many environments (including embedded in your own project)
+* initializr-web: REST endpoints and web interface
+* initializr-actuator: optional module to provide statistics and metrics on project generation
+
+NOTE: The initializr-service is used to run the production instance of Initializr
+but generally, we've found it easier to create an additional module with a Java
+main that we customize and set-up in the IDE (see Step 0).
+
+The Initializr relies on Groovy, HTML and Groovy Templates heavily, so having
+some basic knowledge of those technologies can be helpful.
 
 == Step 0: Initial Development Setup
 
@@ -120,10 +136,12 @@ select Build > Compile 'home.html' / command+shift+f9 (in IntelliJ).  Voila!
 
 == Step 1: Let's add a 3rd party dependency
 
-*Scenario*: You've discovered a great 3rd-party library you want all of your teams to start using
-it.  You also want it to be available for selection from the Initializr.  In this example, we want
-to use http://www.jasypt.org/[Jasypt] to encrypt properties in our properties files and we found the
-perfect https://github.com/ulisesbocchio/jasypt-spring-boot[project] that does that for us:
+*Scenario*: You've discovered a great 3rd-party library you want all of your
+teams to start using.  You also want it to be available for selection from the
+Initializr.  In this example, we want to use http://www.jasypt.org/[Jasypt] to
+encrypt properties in our properties files and we found the perfect
+https://github.com/ulisesbocchio/jasypt-spring-boot[project] that does that for
+us:
 
 . Modify the initializr-app :: src/main/resources/application.yml
 .. Add a custom section (below Ops approx line 643):
@@ -139,8 +157,8 @@ perfect https://github.com/ulisesbocchio/jasypt-spring-boot[project] that does t
           artifactId: jasypt-spring-boot-starter
 ```
 
-NOTE: Since Spring Boot is not managing this dependency we have to specify the exact version OR
-provide our own BOM.
+NOTE: Since Spring Boot is not managing this dependency we have to specify the\
+exact version OR provide our own BOM.
 
 . Select "Make Project" and wait for the reload
 .. In the Dependencies field, you can now type 'Jasypt' or 'encrypt' and the dependency will be automatically show up.
@@ -320,8 +338,9 @@ build/
 # Ignore Gradle GUI config
 gradle-app.setting
 
-# Avoid ignoring Gradle wrapper jar file (.jar files are usually ignored)
+# Avoid ignoring Gradle/Maven wrapper jar file (.jar files are usually ignored)
 !gradle-wrapper.jar
+!maven-wrapper.jar
 
 # Cache of project
 .gradletasknamecache
@@ -771,18 +790,11 @@ a travis.yml file:
 language: java
 jdk:
 - oraclejdk8
-# would just use default install/script but the ./mvnw script errors on travis
-# obviously this only works for maven builds right now...
-install:
-- mvn install -DskipTests=true -Dmaven.javadoc.skip=true -B -V
-script:
-- mvn test
 ```
 
-NOTE: By default, Travis-CI should be able to build this project without the
-install/script customization but we ran into some issues with it running the
-wrapper (mvnw).  By specifying the install/script steps we are explicitly
-overriding the default behavior to avoid this issue.
+NOTE: By default, Travis-CI is able to detect the Maven/Gradle config and
+automatically perform the build for it.  If you want to customize the build, it
+is as easy a adding the steps to the yml file.
 
 * Next add the logic to the ProjectGenerator.groovy file to copy this template
 during the generate step (approx line 173):
@@ -868,7 +880,6 @@ expected a build should be kicked off in a few minutes.
 == Step 9:
 
 https://docs.travis-ci.com/user/deployment/cloudfoundry
-
 
 
 == Parking Lot Ideas
