@@ -39,7 +39,9 @@ a415cdc671d93beb83c15b5c47a05e674574378f]
 * Visit the running Initializr http://localhost:8080/[application].
 
 * Once your sure its properly executing, quit out (ctrl-c) and then import the project into your
-favorite IDE.  We will be using IntelliJ for this but any IDE will work.
+favorite IDE.  We will be using IntelliJ for this but any IDE will work.  If you are using IntelliJ,
+be sure to install the Groovy SDK and configure the groovyc compiler in IntelliJ before importing
+the Initializr project.
 
 IMPORTANT: When using the IDE for Initializr,  we've found it much easier to create a separate
 module that represents a more traditional "main" class over using the CLI in initializr-service.
@@ -888,3 +890,9 @@ https://docs.travis-ci.com/user/deployment/cloudfoundry
 -- ex. [![Build Status](https://travis-ci.org/ssherwood/demo-travis9.svg?branch=master)](https://travis-ci.org/ssherwood/demo-travis9)
 - SonarQube integration: https://docs.travis-ci.com/user/sonarqube/
 - Add support for encrypted properties in Travis-CI: https://docs.travis-ci.com/user/encryption-keys/
+
+== Troubleshooting
+
+Error: Expected 'someclass.groovy' to be an inline constant.
+
+Fix: The Groovy SDK may not be setup in your IDE.  Remove the project from your IDE.  Install/setup the groovy compilier in your IDE and reimport the Initializr project.
