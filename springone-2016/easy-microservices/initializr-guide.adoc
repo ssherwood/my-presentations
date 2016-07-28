@@ -891,7 +891,8 @@ https://docs.travis-ci.com/user/deployment/cloudfoundry
 - SonarQube integration: https://docs.travis-ci.com/user/sonarqube/
 - Add support for encrypted properties in Travis-CI: https://docs.travis-ci.com/user/encryption-keys/
 
-== Troubleshooting:
+== Troubleshooting
 
 Error: Expected 'someclass.groovy' to be an inline constant.
+
 Fix: The Groovy SDK may not be setup in your IDE.  Remove the project from your IDE.  Install/setup the groovy compilier in your IDE and reimport the Initializr project.
