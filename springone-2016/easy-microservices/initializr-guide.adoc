@@ -2,6 +2,7 @@
 
 :toc:
 
+[[Anatomy]]
 == Anatomy of the Initializr
 
 Spring Initializr provides an extensible API to generate quickstart projects.
@@ -22,6 +23,7 @@ main that we customize and set-up in the IDE (see Step 0).
 The Initializr relies on Groovy, HTML and Groovy Templates heavily, so having
 some basic knowledge of those technologies can be helpful.
 
+[[Step0]]
 == Step 0: Initial Development Setup
 
 Follow these steps to setup and configure your development environment to be able to customize the
@@ -138,6 +140,7 @@ If this is all working, make a change to the web template in initializr-web >
 src/main/resources/templates/home.html - change "Spring Initializr" to "My Spring Initializr" and
 select Build > Compile 'home.html' / command+shift+f9 (in IntelliJ).  Voila!
 
+[[Step1]]
 == Step 1: Let's add a 3rd party dependency
 
 *Scenario*: You've discovered a great 3rd-party library you want all of your
@@ -183,6 +186,7 @@ secret.password=ENC(nrmZtkF7T0kjG/VodDvBw93Ct8EgjCA+)
 . Visit the applications http://localhost:9000/env/[env] URL.
 Notice how Spring Boot masks the value if the property name contains password.
 
+[[Step2]]
 == Step 2: Lets add a VCS .ignore file
 
 *Scenario*: Most of us are using Git right?  For those of us that are, a common step after
@@ -376,6 +380,7 @@ to change this default behavior before it will work.
 * Generate a new application and unzip it.  You should now be able to verify that a .gitingore file
 is included with Spring Boot.
 
+[[Step3]]
 == Step 3: Lets add a customizable README
 
 *Scenario*: Since we are generating a starter Spring Boot application it might be a good idea to
@@ -437,6 +442,7 @@ changed).
 * Make Project and wait for the UI reload.  This time, generate an application with the Jasypt
 dependency and see that it contains the extra documentation link.
 
+[[Step4]]
 == Step 4: Wait a minute!  You've not been writing any unit tests! (Lets write some tests)
 
 ....
@@ -503,6 +509,7 @@ behaviors - this should limit the merge conflicts that you have when the Initial
 our company or team.  These aren't likely to be adopted by the Initializr team, so we'll frequently
 end up having to merge in changes from upstream.
 
+[[Step5]]
 == Step 5: Let's make it easier to generate a "standard" Microservice
 
 *Scenario*: We want some standardization on the required starters for our team (for example, all
@@ -564,6 +571,7 @@ Combined with being able to add our own custom dependencies we now have a solid 
 generating Boot apps that are more in line with our team's guidelines and standards.  We can ensure
 our teammates will be setup for success right out of the gate.
 
+[[Step6]]
 == Step 6: Let's enhance our Git support
 
 *Scenario*: We already created a .gitignore file to support our VCS but what we'd really like is to
@@ -695,6 +703,7 @@ name in GitHub.
 By now, you should be able to see where this is all going.  We're very close to
 having a completely automated repo provisioned directly from the Initializr.
 
+[[Step7]]
 == Step 7: Use the GitHub API to finalize automation
 
 *Scenario*: We want to fully automate the work from Step 6.  Since GitHub
@@ -739,6 +748,7 @@ Assuming the changes take effect, you should now be able to generate from the
 Initializr and have it automatically create the GitHub repo for you.  This was
 actually pretty easy.
 
+[[Step8]]
 == Step 8:
 
 *Scenario*: We usually setup a Travis-CI build manually after the first commit
@@ -881,6 +891,7 @@ generate a project from the Initializr that not only will create and push the
 code to GitHub but a Travis-CI build will be setup.  If everything worked as
 expected a build should be kicked off in a few minutes.
 
+[[Step9]]
 == Step 9:
 
 https://docs.travis-ci.com/user/deployment/cloudfoundry
