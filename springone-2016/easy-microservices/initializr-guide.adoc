@@ -1,15 +1,6 @@
 = SpringOne Platform 2016 : Easy Consumption of Microservices
-
-:library: Asciidoctor
-:idprefix:
-:numbered:
-:imagesdir: images
-:toc: manual
-:css-signature: demo
+:toc:
 :toc-placement: preamble
-//:max-width: 800px
-//:doctype: book
-//:sectids!:
 
 [[Anatomy]]
 == Anatomy of the Initializr
