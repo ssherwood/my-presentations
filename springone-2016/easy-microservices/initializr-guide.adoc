@@ -1,6 +1,8 @@
 = SpringOne Platform 2016 : Easy Consumption of Microservices
 :toc:
-:toc-placement: preamble
+:toc-placement!:
+
+toc::[]
 
 [[Anatomy]]
 == Anatomy of the Initializr
