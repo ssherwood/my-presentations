@@ -1,5 +1,7 @@
 = SpringOne Platform 2016 : Easy Consumption of Microservices
 
+:toc:
+
 == Anatomy of the Initializr
 
 Spring Initializr provides an extensible API to generate quickstart projects.
